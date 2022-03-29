@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.franny.screencastdemo.media.ScreenRecordCallback
 import com.franny.screencastdemo.media.ScreenRecorder
-import com.franny.screencastdemo.network.getLocalIPAddress
 import com.franny.screencastdemo.network.tcp.TCPCallback
 import com.franny.screencastdemo.network.tcp.TCPClientThread
 import com.franny.screencastdemo.network.tcp.TCPMessageHeader
@@ -16,6 +15,8 @@ import com.franny.screencastdemo.network.udp.UDPConstant
 import com.franny.screencastdemo.network.udp.UDPMessageHeader
 import com.franny.screencastdemo.network.udp.UDPReceiveThread
 import com.franny.screencastdemo.network.udp.UDPSendThread
+import com.franny.screencastdemo.network.utils.ByteTools
+import com.franny.screencastdemo.network.utils.getLocalIPAddress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -44,6 +45,12 @@ class DashboardViewModel : ViewModel() {
     private var tcpClientThread: TCPClientThread? = null
     var tcpServerThread: TCPServerThread? = null
 
+    var localScreenWidth: Int = 0
+    var localScreenHeight: Int = 0
+    var remoteScreenWidth: Int = 0
+    var remoteScreenHeight: Int = 0
+    var screenCastCallback: TCPCallback? = null
+
     private val udpCallback = object : UDPCallback {
         override fun onReceive(ip: String, data: ByteArray) {
             val cmdType = data[0]
@@ -56,26 +63,50 @@ class DashboardViewModel : ViewModel() {
                 }
                 UDPMessageHeader.ACTION_REQUEST_CAST_CONTROL -> {
                     isSender = false
+
+                    val remoteScreenWidthBytes = ByteArray(4)
+                    System.arraycopy(data, 1, remoteScreenWidthBytes, 0, 4)
+                    remoteScreenWidth = ByteTools.bytesToInt(remoteScreenWidthBytes)
+                    val remoteScreenHeightBytes = ByteArray(4)
+                    System.arraycopy(data, 5, remoteScreenHeightBytes, 0, 4)
+                    remoteScreenHeight = ByteTools.bytesToInt(remoteScreenHeightBytes)
+
                     if (tcpServerThread == null) {
                         tcpServerThread = TCPServerThread()
                     }
                     tcpServerThread?.addTCPCallback(tcpCallback)
                     tcpServerThread?.start()
-                    udpSendThread?.setTargetIPAndData(
-                        ip,
-                        byteArrayOf(UDPMessageHeader.ACTION_ACCEPT_CAST_CONTROL)
-                    )
+
+                    val head = byteArrayOf(UDPMessageHeader.ACTION_ACCEPT_CAST_CONTROL)
+                    val localScreenWidthBytes = ByteTools.intToBytes(localScreenWidth)
+                    val localScreenHeightBytes = ByteTools.intToBytes(localScreenHeight)
+                    val newData = ByteArray(head.size + localScreenWidthBytes.size + localScreenHeightBytes.size)
+                    System.arraycopy(head, 0, newData, 0, head.size)
+                    System.arraycopy(localScreenWidthBytes, 0, newData, head.size, localScreenHeightBytes.size)
+                    System.arraycopy(localScreenHeightBytes, 0, newData, head.size + localScreenWidthBytes.size, localScreenHeightBytes.size)
+
+                    udpSendThread?.setTargetIPAndData(ip, newData)
+                    _log.postValue("udp: receive ACTION_REQUEST_CAST_CONTROL from $ip, remoteScreen ($remoteScreenWidth, $remoteScreenHeight)")
                 }
                 UDPMessageHeader.ACTION_ACCEPT_CAST_CONTROL -> {
+                    val remoteScreenWidthBytes = ByteArray(4)
+                    System.arraycopy(data, 1, remoteScreenWidthBytes, 0, 4)
+                    remoteScreenWidth = ByteTools.bytesToInt(remoteScreenWidthBytes)
+                    val remoteScreenHeightBytes = ByteArray(4)
+                    System.arraycopy(data, 5, remoteScreenHeightBytes, 0, 4)
+                    remoteScreenHeight = ByteTools.bytesToInt(remoteScreenHeightBytes)
+
                     tcpClientThread = TCPClientThread(ip)
                     tcpClientThread?.addTCPCallback(tcpCallback)
                     tcpClientThread?.start()
+                    _log.postValue("udp: receive ACTION_ACCEPT_CAST_CONTROL from $ip, remoteScreen ($remoteScreenWidth, $remoteScreenHeight)")
                 }
                 UDPMessageHeader.ACTION_STOP_CAST_CONTROL -> {
                     tcpClientThread?.close()
                     tcpClientThread = null
                     tcpServerThread?.close()
                     tcpServerThread = null
+                    _log.postValue("udp: receive ACTION_STOP_CAST_CONTROL from $ip")
                 }
             }
         }
@@ -99,6 +130,8 @@ class DashboardViewModel : ViewModel() {
                 udpSendThread?.stopSend()
                 udpSendThread = null
             }
+            screenCastCallback?.onConnect(ip)
+            _log.postValue("tcp: connect ip $ip")
         }
 
         override fun onDisconnect() {
@@ -116,23 +149,29 @@ class DashboardViewModel : ViewModel() {
                 )
                 udpSendThread?.start()
             }
+            screenCastCallback?.onDisconnect()
+            _log.postValue("tcp: disconnect")
         }
 
         override fun onFrame(data: ByteArray) {
-
+            screenCastCallback?.onFrame(data)
         }
 
         override fun processMoveAction(action: Int, x: Int, y: Int) {
-
+            screenCastCallback?.processMoveAction(action, x, y)
         }
     }
 
     fun requestCastAndControl(targetIP: String) {
         isSender = true
-        udpSendThread?.setTargetIPAndData(
-            targetIP,
-            byteArrayOf(UDPMessageHeader.ACTION_REQUEST_CAST_CONTROL)
-        )
+        val head = byteArrayOf(UDPMessageHeader.ACTION_REQUEST_CAST_CONTROL)
+        val localScreenWidthBytes = ByteTools.intToBytes(localScreenWidth)
+        val localScreenHeightBytes = ByteTools.intToBytes(localScreenHeight)
+        val data = ByteArray(head.size + localScreenWidthBytes.size + localScreenHeightBytes.size)
+        System.arraycopy(head, 0, data, 0, head.size)
+        System.arraycopy(localScreenWidthBytes, 0, data, head.size, localScreenHeightBytes.size)
+        System.arraycopy(localScreenHeightBytes, 0, data, head.size + localScreenWidthBytes.size, localScreenHeightBytes.size)
+        udpSendThread?.setTargetIPAndData(targetIP, data)
     }
 
     fun stopCastAndControl() {

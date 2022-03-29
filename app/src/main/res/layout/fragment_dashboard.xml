@@ -32,7 +32,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="100dp">
+        android:layout_marginTop="10dp">
         <Button
             android:id="@+id/start_cast_control"
             android:layout_weight="1"
@@ -79,5 +79,5 @@
         android:textColor="@android:color/black"
         android:background="@android:color/darker_gray"
         android:scrollbars="vertical"
-        android:gravity="top"/>
+        android:gravity="bottom"/>
 </LinearLayout>

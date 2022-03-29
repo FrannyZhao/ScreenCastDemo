@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         val navViewPager = binding.navViewpager
         navViewPager.adapter = adapter
         navViewPager.offscreenPageLimit = 3
+        navViewPager.isUserInputEnabled = false
         navViewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
                 super.onPageSelected(position)
@@ -35,7 +36,7 @@ class MainActivity : AppCompatActivity() {
             when(it.itemId) {
                 R.id.navigation_dashboard -> navViewPager.currentItem = 0
                 R.id.navigation_screen_cast -> navViewPager.currentItem = 1
-                R.id.navigation_control -> navViewPager.currentItem = 2
+                R.id.navigation_test -> navViewPager.currentItem = 2
             }
             true
         }

@@ -14,6 +14,8 @@ import com.franny.screencastdemo.R
 import com.franny.screencastdemo.databinding.FragmentDashboardBinding
 import com.franny.screencastdemo.media.ScreenRecordService
 import com.franny.screencastdemo.media.ScreenRecorder
+import com.franny.screencastdemo.media.getScreenHeight
+import com.franny.screencastdemo.media.getScreenWidth
 import timber.log.Timber
 
 class DashboardFragment : Fragment() {
@@ -26,15 +28,20 @@ class DashboardFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        Timber.d("onCreateView")
+        val screenWidth = getScreenWidth(requireContext())
+        val screenHeight = getScreenHeight(requireContext())
+        Timber.d("onCreateView, localScreen ($screenWidth, $screenHeight)")
         _binding = FragmentDashboardBinding.inflate(inflater, container, false)
         val root: View = binding.root
+
+        dashboardViewModel.localScreenWidth = screenWidth
+        dashboardViewModel.localScreenHeight = screenHeight
 
         dashboardViewModel.localIP.observe(viewLifecycleOwner) {
             binding.localIp.text = if (it.isNullOrEmpty()) {
                 getString(R.string.network_error)
             } else {
-                String.format(getString(R.string.local_ip), it)
+                String.format(getString(R.string.local_ip), it, screenWidth, screenHeight)
             }
         }
 
@@ -65,7 +72,7 @@ class DashboardFragment : Fragment() {
             if (it != null && dashboardViewModel.isSender) {
                 val serviceIntent = Intent(requireContext(), ScreenRecordService::class.java)
                 val bundle = bundleOf(
-                    Pair("type", ScreenRecordService.COMMAND_RECORD),
+                    Pair("type", ScreenRecordService.COMMAND_RECORD)
                 )
                 serviceIntent.putExtras(bundle)
                 requireContext().startForegroundService(serviceIntent)

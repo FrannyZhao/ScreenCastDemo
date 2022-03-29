@@ -1,12 +1,18 @@
 package com.franny.screencastdemo.media
 
 import android.content.Context
+import android.graphics.Point
+import android.view.WindowManager
 
 /**
  * 获取手机高宽密度
  */
 fun getScreenWidth(context: Context): Int {
-    return context.resources.displayMetrics.widthPixels
+    val display =
+        (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+    val outPoint = Point()
+    display.getRealSize(outPoint) // include navigation bar
+    return outPoint.x
 }
 
 /**
@@ -16,7 +22,11 @@ fun getScreenWidth(context: Context): Int {
  * @return
  */
 fun getScreenHeight(context: Context): Int {
-    return context.resources.displayMetrics.heightPixels
+    val display =
+        (context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay
+    val outPoint = Point()
+    display.getRealSize(outPoint) // include navigation bar
+    return outPoint.y
 }
 
 /**

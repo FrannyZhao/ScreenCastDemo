@@ -28,9 +28,9 @@ class MediaEncoder constructor(
     private var pps: ByteArray? = null
 
     // screen
-    private var screenWidth = 0
-    private var screenHeight = 0
-    private var screenDpi = 0
+    private var localScreenWidth = 0
+    private var localScreenHeight = 0
+    private var localScreenDpi = 0
 
     private var projection: MediaProjection? = null
     private var screenRecordCallback: ScreenRecordCallback? = null
@@ -67,9 +67,9 @@ class MediaEncoder constructor(
     }
 
     fun setContext(context: Context): MediaEncoder {
-        screenWidth = getScreenWidth(context)
-        screenHeight = getScreenHeight(context)
-        screenDpi = getScreenDpi(context)
+        localScreenWidth = getScreenWidth(context)
+        localScreenHeight = getScreenHeight(context)
+        localScreenDpi = getScreenDpi(context)
         return this
     }
 
@@ -87,9 +87,9 @@ class MediaEncoder constructor(
         }
         virtualDisplay = projection?.createVirtualDisplay(
             "screen",
-            screenWidth,
-            screenHeight,
-            screenDpi,
+            localScreenWidth,
+            localScreenHeight,
+            localScreenDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC,
             eglRender?.getDecodeSurface(),
             null,
@@ -107,8 +107,8 @@ class MediaEncoder constructor(
      */
     @Throws(IOException::class)
     private fun prepareEncoder() {
-        Timber.i("record surface size: ($screenWidth, $screenHeight)")
-        val mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, screenWidth, screenHeight)
+        Timber.i("record surface size: ($localScreenWidth, $localScreenHeight)")
+        val mediaFormat = MediaFormat.createVideoFormat(MIME_TYPE, localScreenWidth, localScreenHeight)
         mediaFormat.setInteger(
             MediaFormat.KEY_COLOR_FORMAT,
             MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
@@ -120,7 +120,7 @@ class MediaEncoder constructor(
         mediaCodec?.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         surface = mediaCodec?.createInputSurface()
         surface?.let {
-            eglRender = EGLRender(it, screenWidth, screenHeight, videoFps, frameCallback)
+            eglRender = EGLRender(it, localScreenWidth, localScreenHeight, videoFps, frameCallback)
             mediaCodec?.start()
         }
     }
